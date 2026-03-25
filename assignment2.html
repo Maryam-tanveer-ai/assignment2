@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz System</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { background:#f5f7fb; }
+
+.quiz-layout { display:flex; gap:20px; padding:20px; }
+
+.option {
+    padding:12px;
+    border:1px solid #ccc;
+    border-radius:10px;
+    margin-bottom:10px;
+    cursor:pointer;
+}
+.option.selected { border:2px solid green; }
+
+.circle {
+    width:120px;height:120px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:bold;
+}
+
+.q-nav {
+    padding:6px;
+    margin:5px 0;
+    border-radius:6px;
+    background:#eee;
+    cursor:pointer;
+}
+.q-nav.active { background:green;color:white; }
+.q-nav.done { background:#d4edda; }
+
+.timer { color:red;font-weight:bold; }
+
+/* RESULT UI */
+.result-box {
+    max-width:800px;
+    margin:auto;
+    margin-top:40px;
+    background:white;
+    padding:25px;
+    border-radius:15px;
+}
+
+.summary {
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:20px;
+}
+
+.card-small {
+    flex:1;
+    margin:5px;
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    font-weight:bold;
+}
+
+.correct { background:#d4edda; }
+.wrong { background:#f8d7da; }
+.unattempted { background:#e2e3e5; }
+
+.question-card {
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:15px;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- QUIZ PAGE -->
+<div id="quizPage">
+
+<div class="quiz-layout">
+
+<div class="flex-fill bg-white p-3 rounded">
+<h5 id="qNo"></h5>
+<div class="timer" id="timer"></div>
+<h4 id="question"></h4>
+<div id="options"></div>
+
+<button class="btn btn-primary" onclick="nextQuestion()">Next</button>
+<button class="btn btn-success" onclick="submitQuiz()">Submit</button>
+</div>
+
+<div class="bg-white p-3 rounded text-center">
+<div class="circle mx-auto mb-2" id="circle">
+<span id="percent">0%</span>
+</div>
+<div id="qList"></div>
+</div>
+
+</div>
+</div>
+
+<!-- RESULT PAGE -->
+<div id="resultPage" style="display:none">
+<!-- Download button will be added dynamically -->
+</div>
+
+<script>
+let questions=[
+{q:"JS scope?",o:["var","let","const","all"],a:"let"},
+{q:"HTML link CSS?",o:["link","style","css","script"],a:"link"},
+{q:"Array remove?",o:["pop","push","shift","slice"],a:"pop"},
+{q:"CSS color?",o:["font","color","bg","text"],a:"color"},
+{q:"ID select?",o:["getElementById","query","id","none"],a:"getElementById"}
+];
+
+let answers=new Array(questions.length).fill(null);
+let current=0,time=30,timer;
+
+// LOAD QUESTION
+function loadQuestion(i){
+    current=i;
+    qNo.innerText=`Q ${i+1}/${questions.length}`;
+    question.innerText=questions[i].q;
+
+    options.innerHTML="";
+
+    questions[i].o.forEach(opt=>{
+        let div=document.createElement("div");
+        div.className="option";
+        div.innerText=opt;
+
+        if(answers[i]===opt) div.classList.add("selected");
+
+        div.onclick=()=>{
+            document.querySelectorAll(".option").forEach(o=>o.classList.remove("selected"));
+            div.classList.add("selected");
+            answers[i]=opt;
+            updateProgress();
+            updateNav();
+        };
+
+        options.appendChild(div);
+    });
+
+    updateNav();
+    startTimer();
+}
+
+// TIMER
+function startTimer(){
+    clearInterval(timer);
+    time=30;
+
+    timer=setInterval(()=>{
+        timerEl.innerText="Time: "+time+"s";
+        time--;
+
+        if(time<0){
+            clearInterval(timer);
+            nextQuestion();
+        }
+    },1000);
+}
+
+const timerEl=document.getElementById("timer");
+
+// NEXT
+function nextQuestion(){
+    if(current<questions.length-1){
+        loadQuestion(current+1);
+    } else {
+        submitQuiz();
+    }
+}
+
+// NAV
+function updateNav(){
+    qList.innerHTML="";
+    questions.forEach((q,i)=>{
+        let div=document.createElement("div");
+        div.className="q-nav";
+
+        if(i===current) div.classList.add("active");
+        if(answers[i]) div.classList.add("done");
+
+        div.innerText="Q"+(i+1);
+        div.onclick=()=>loadQuestion(i);
+
+        qList.appendChild(div);
+    });
+}
+
+// PROGRESS
+function updateProgress(){
+    let done=answers.filter(a=>a!==null).length;
+    let percent=Math.round((done/questions.length)*100);
+
+    percentEl.innerText=percent+"%";
+    circle.style.background=`conic-gradient(green ${percent}%, #ddd ${percent}%)`;
+}
+
+const percentEl=document.getElementById("percent");
+const circle=document.getElementById("circle");
+
+// RESULT
+function submitQuiz(){
+    clearInterval(timer);
+
+    let correct=0,wrong=0,unattempted=0;
+
+    let html=`<div class="result-box">
+    <h3 class="mb-3">Quiz Result</h3>
+    <button class="btn btn-secondary mb-3" onclick="downloadResult()">Download Result</button>`;
+
+    questions.forEach((q,i)=>{
+        let user=answers[i];
+
+        if(user===q.a) correct++;
+        else if(user===null) unattempted++;
+        else wrong++;
+    });
+
+    html+=`
+    <div class="summary">
+        <div class="card-small bg-primary text-white">Total<br>${questions.length}</div>
+        <div class="card-small correct">Correct<br>${correct}</div>
+        <div class="card-small wrong">Wrong<br>${wrong}</div>
+        <div class="card-small unattempted">Unattempted<br>${unattempted}</div>
+    </div>`;
+
+    questions.forEach((q,i)=>{
+        let user=answers[i];
+        let cls="unattempted";
+
+        if(user===q.a) cls="correct";
+        else if(user) cls="wrong";
+
+        html+=`
+        <div class="question-card ${cls}">
+        <b>Q${i+1}:</b> ${q.q}<br>
+        Your Answer: ${user||"Not Attempted"}<br>
+        Correct Answer: ${q.a}
+        </div>`;
+    });
+
+    html+=`</div>`;
+
+    quizPage.style.display="none";
+    resultPage.style.display="block";
+    resultPage.innerHTML=html;
+}
+
+// DOWNLOAD RESULT
+function downloadResult() {
+    let htmlContent = `
+    <html>
+    <head>
+    <meta charset="UTF-8">
+    <title>Quiz Result</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f5f7fb; padding:20px; }
+        .result-box { max-width:800px; margin:auto; background:white; padding:25px; border-radius:15px; }
+        .summary { display:flex; justify-content:space-between; margin-bottom:20px; }
+        .card-small { flex:1; margin:5px; padding:15px; border-radius:10px; text-align:center; font-weight:bold; }
+        .correct { background:#d4edda; }
+        .wrong { background:#f8d7da; }
+        .unattempted { background:#e2e3e5; }
+        .question-card { border:1px solid #ddd; border-radius:10px; padding:15px; margin-bottom:10px; }
+    </style>
+    </head>
+    <body>
+        <div class="result-box">
+            <h3 class="mb-3">Quiz Result</h3>
+            <div class="summary">
+                <div class="card-small bg-primary text-white">Total<br>${questions.length}</div>
+                <div class="card-small correct">Correct<br>${answers.filter((a,i)=>a===questions[i].a).length}</div>
+                <div class="card-small wrong">Wrong<br>${answers.filter((a,i)=>a && a!==questions[i].a).length}</div>
+                <div class="card-small unattempted">Unattempted<br>${answers.filter(a=>!a).length}</div>
+            </div>`;
+
+    questions.forEach((q,i)=>{
+        let user=answers[i];
+        let cls="unattempted";
+        if(user===q.a) cls="correct";
+        else if(user) cls="wrong";
+
+        htmlContent+=`
+        <div class="question-card ${cls}">
+            <b>Q${i+1}:</b> ${q.q}<br>
+            Your Answer: ${user||"Not Attempted"}<br>
+            Correct Answer: ${q.a}
+        </div>`;
+    });
+
+    htmlContent+=`</div></body></html>`;
+
+    let blob = new Blob([htmlContent], { type: "text/html" });
+    let url = URL.createObjectURL(blob);
+
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "quiz_result.html";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// INIT
+loadQuestion(0);
+</script>
+
+</body>
+</html>
